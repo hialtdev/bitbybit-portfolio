@@ -1,0 +1,33 @@
+Migration Best Practices
+1. Version Control
+- Numbered files: Keep migrations sequential (001_create_users.js, 002_users_seed.js, etc.).
+- Commit history: Each migration should be a separate commit with a clear message.
+- Changelog: Document schema/index changes in CHANGELOG.md or migration log.
+2. Environment Discipline
+- Staging first: Always run migrations in staging before production.
+- Rollback test: Verify the down function works in staging before deploying.
+- Isolation: Never run migrations directly on production without testing.
+3. Rollback Safety
+- Down functions: Every migration must have a rollback path (drop, $unset, revert values).
+- Data backups: Snapshot your database before applying migrations.
+- Granularity: Keep migrations small and focused (one schema change, one index, one data transform).
+4. Team Workflow
+- One migration per PR: Easier to review and revert.
+- Code review: Ensure another engineer validates schema/index logic.
+- Lockstep execution: Use a migration tool (e.g., migrate-mongo) so all environments apply migrations consistently.
+5. Operational Guardrails
+- Idempotency: Migrations should be safe to re‑run (e.g., createIndex won’t fail if index exists).
+- Monitoring: Log migration start/end, errors, and affected document counts.
+- Performance: For large updates, batch or throttle to avoid locking production.
+6. Documentation
+- Schema docs: Keep users.md updated alongside migrations.
+- Seed separation: Store seeds in dedicated files/scripts, not mixed with schema.
+- Audit trail: Note who ran migrations and when.
+
+🚀 Suggested Workflow
+- Write migration → commit → PR.
+- Review + approve.
+- Apply in staging → verify schema, indexes, and data.
+- Test rollback (down).
+- Apply in production with monitoring enabled.
+- Update docs (users.md, changelog).

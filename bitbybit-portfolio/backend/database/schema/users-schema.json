@@ -1,0 +1,72 @@
+{
+  "$jsonSchema": {
+    "bsonType": "object",
+    "required": ["email", "authProvider", "status", "createdAt", "updatedAt"],
+    "additionalProperties": false,
+    "properties": {
+      "_id": { "bsonType": "objectId" },
+      "email": {
+        "bsonType": "string",
+        "description": "lowercase, unique",
+        "minLength": 5,
+        "maxLength": 254,
+        "pattern": "^[a-z0-9._%+-]+@[a-z0-9.-]+\\.[a-z]{2,}$"
+      },
+      "username": {
+        "bsonType": "string",
+        "minLength": 3,
+        "maxLength": 32,
+        "pattern": "^[a-z0-9]([a-z0-9-_]*[a-z0-9])$"
+      },
+      "authProvider": {
+        "enum": ["local", "google", "github", "microsoft", "okta"]
+      },
+      "passwordHash": { "bsonType": "string" },
+      "salt": { "bsonType": "string" },
+      "roles": {
+        "bsonType": "array",
+        "items": { "enum": ["user", "admin", "manager", "support"] },
+        "uniqueItems": true
+      },
+      "status": { "enum": ["active", "invited", "disabled", "locked"] },
+      "profile": {
+        "bsonType": "object",
+        "required": [],
+        "additionalProperties": false,
+        "properties": {
+          "name": { "bsonType": "string", "maxLength": 120 },
+          "displayName": { "bsonType": "string", "maxLength": 60 },
+          "avatarPath": { "bsonType": "string", "maxLength": 512 },
+          "bio": { "bsonType": "string", "maxLength": 280 },
+          "location": { "bsonType": "string", "maxLength": 120 }
+        }
+      },
+      "createdAt": { "bsonType": "date" },
+      "updatedAt": { "bsonType": "date" },
+      "lastLoginAt": { "bsonType": "date" },
+      "loginCount": { "bsonType": "int", "minimum": 0 },
+      "mfaEnabled": { "bsonType": "bool" },
+      "mfaMethods": {
+        "bsonType": "array",
+        "items": { "enum": ["totp", "webauthn", "sms"] },
+        "uniqueItems": true
+      },
+      "emailVerification": {
+        "bsonType": "object",
+        "additionalProperties": false,
+        "properties": {
+          "verified": { "bsonType": "bool" },
+          "verifiedAt": { "bsonType": "date" }
+        }
+      },
+      "passwordReset": {
+        "bsonType": "object",
+        "additionalProperties": false,
+        "properties": {
+          "pending": { "bsonType": "bool" },
+          "requestedAt": { "bsonType": "date" }
+        }
+      }
+    }
+  }
+}

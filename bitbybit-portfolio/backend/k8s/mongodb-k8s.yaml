@@ -1,0 +1,223 @@
+---
+# Secret — credentials for MongoDB
+apiVersion: v1
+kind: Secret
+metadata:
+  name: mongodb-secret
+  namespace: default
+type: Opaque
+stringData:
+  mongo-root-username: ${MONGODB_USER}      # Set via local environment
+  mongo-root-password: ${MONGODB_PASSWORD}  # Set via local environment
+  mongo-uri: ${MONGODB_URI}                 # Structured as mongodb://user:pass@service...
+
+---
+# ConfigMap — init script mounted into container
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mongodb-init-script
+  namespace: default
+data:
+  init-bitbybit.js: |
+    db = db.getSiblingDB('bitbybit');
+
+    print("=== BitByBit DB Init Starting ===");
+
+    // ── USERS ──────────────────────────────────────────────────────────────
+    db.createCollection("users", {
+      validator: {
+        $jsonSchema: {
+          bsonType: "object",
+          required: ["username", "email", "password", "role", "createdAt", "updatedAt"],
+          properties: {
+            _id:      { bsonType: "binData" },
+            username: { bsonType: "string", minLength: 3, maxLength: 50 },
+            email:    { bsonType: "string", minLength: 5, maxLength: 100 },
+            password: { bsonType: "string", minLength: 8, maxLength: 255 },
+            role:     { enum: ["USER", "ADMIN", "SUPPORT"] },
+            createdAt: { bsonType: "date" },
+            updatedAt: { bsonType: "date" }
+          }
+        }
+      },
+      validationAction: "warn"
+    });
+
+    db.collection("users").createIndex({ email: 1 },    { unique: true, name: "unique_email" });
+    db.collection("users").createIndex({ username: 1 }, { unique: true, sparse: true, name: "unique_username" });
+    print("users collection ready.");
+
+    // ── EVENTS ─────────────────────────────────────────────────────────────
+    db.createCollection("events", {
+      validator: {
+        $jsonSchema: {
+          bsonType: "object",
+          required: ["title", "date", "createdAt", "updatedAt"],
+          properties: {
+            _id:         { bsonType: "binData" },
+            userId:      { bsonType: "binData" },
+            createdBy:   { bsonType: "binData" },
+            title:       { bsonType: "string", minLength: 1, maxLength: 100 },
+            description: { bsonType: "string", maxLength: 500 },
+            date:        { bsonType: "date" },
+            tags:        { bsonType: "array", items: { bsonType: "string" } },
+            visibility:  { enum: ["PUBLIC", "PRIVATE", "SUPPORT_ONLY"] },
+            createdAt:   { bsonType: "date" },
+            updatedAt:   { bsonType: "date" },
+            media: {
+              bsonType: "array",
+              items: {
+                bsonType: "object",
+                properties: {
+                  id:       { bsonType: "binData" },
+                  url:      { bsonType: "string", maxLength: 512 },
+                  type:     { enum: ["IMAGE", "VIDEO", "AUDIO", "DOCUMENT"] },
+                  caption:  { bsonType: "string", maxLength: 280 },
+                  featured: { bsonType: "bool" }
+                }
+              }
+            }
+          }
+        }
+      },
+      validationAction: "warn"
+    });
+
+    db.collection("events").createIndex({ userId: 1, date: 1 }, { name: "idx_user_timeline" });
+    db.collection("events").createIndex({ tags: 1 },             { name: "idx_tags" });
+    print("events collection ready.");
+
+    // ── AUDIT_LOGS ─────────────────────────────────────────────────────────
+    db.createCollection("audit_logs");
+    db.collection("audit_logs").createIndex({ userId: 1 });
+    db.collection("audit_logs").createIndex({ entityType: 1, entityId: 1 });
+    db.collection("audit_logs").createIndex({ createdAt: -1 });
+    db.collection("audit_logs").createIndex({ userId: 1, createdAt: -1 }, { name: "idx_user_audit_timeline" });
+    print("audit_logs collection ready.");
+
+    // ── SEED devadmin ───────────────────────────────────────────────────────
+    var now = new Date();
+    var existing = db.collection("users").findOne({ username: "devadmin" });
+    if (!existing) {
+      db.collection("users").insertOne({
+        username: "devadmin",
+        email: "devadmin@bitbybit.local",
+        password: "$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy",
+        role: "ADMIN",
+        createdAt: now,
+        updatedAt: now
+      });
+      print("devadmin seeded (password: devadmin123).");
+    } else {
+      print("devadmin exists, skipping.");
+    }
+
+    print("=== BitByBit DB Init Complete ===");
+
+---
+# PersistentVolumeClaim — 2Gi local storage
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: mongodb-pvc
+  namespace: default
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: local-path
+  resources:
+    requests:
+      storage: 2Gi
+
+---
+# Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mongodb
+  namespace: default
+  labels:
+    app: mongodb
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mongodb
+  template:
+    metadata:
+      labels:
+        app: mongodb
+    spec:
+      containers:
+        - name: mongodb
+          image: mongo:7.0
+          ports:
+            - containerPort: 27017
+          env:
+            - name: MONGO_INITDB_ROOT_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: mongodb-secret
+                  key: mongo-root-username
+            - name: MONGO_INITDB_ROOT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: mongodb-secret
+                  key: mongo-root-password
+            - name: MONGO_INITDB_DATABASE
+              value: bitbybit
+          volumeMounts:
+            - name: mongodb-storage
+              mountPath: /data/db
+            - name: mongodb-init
+              mountPath: /docker-entrypoint-initdb.d
+              readOnly: true
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "100m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
+          livenessProbe:
+            exec:
+              command:
+                - mongosh
+                - --eval
+                - "db.adminCommand('ping')"
+            initialDelaySeconds: 30
+            periodSeconds: 20
+            timeoutSeconds: 5
+          readinessProbe:
+            exec:
+              command:
+                - mongosh
+                - --eval
+                - "db.adminCommand('ping')"
+            initialDelaySeconds: 20
+            periodSeconds: 10
+            timeoutSeconds: 5
+      volumes:
+        - name: mongodb-storage
+          persistentVolumeClaim:
+            claimName: mongodb-pvc
+        - name: mongodb-init
+          configMap:
+            name: mongodb-init-script
+
+---
+# ClusterIP Service — internal access only
+apiVersion: v1
+kind: Service
+metadata:
+  name: mongodb-service
+  namespace: default
+spec:
+  selector:
+    app: mongodb
+  ports:
+    - protocol: TCP
+      port: 27017
+      targetPort: 27017
+  type: ClusterIP

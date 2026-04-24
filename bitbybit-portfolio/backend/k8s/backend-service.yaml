@@ -1,0 +1,15 @@
+# ===============================================================
+# PART 2: The Service (The Constant Network Entry Point)
+# ===============================================================
+apiVersion: v1
+kind: Service
+metadata:
+  name: bitbybit-service
+spec:
+  selector:
+    app: bitbybit
+  ports:
+    - protocol: TCP
+      port: 8080        # Internal cluster port
+      targetPort: 8080  # Spring Boot port
+  type: ClusterIP

@@ -1,0 +1,13 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - backend-deployment.yaml
+  - backend-service.yaml
+  - backend-ingress.yaml
+  # cloudflare-tunnel.yaml — runs in default namespace only, not managed by pipeline
+  # mongodb-k8s.yaml — applied manually, never via pipeline
+  # bitbybit-public-ingress.yaml — legacy default namespace, kept for reference only
+images:
+  - name: bitbybit-backend        # canonical name — overlays override this
+    newName: bitbybit-backend     # no-op in base, but documents the image key

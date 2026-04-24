@@ -1,0 +1,45 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: bitbybit-frontend
+  labels:
+    app: bitbybit-frontend
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: bitbybit-frontend
+  template:
+    metadata:
+      labels:
+        app: bitbybit-frontend
+    spec:
+      imagePullSecrets:
+        - name: ghcr-secret   # applied manually per namespace, never committed
+      containers:
+        - name: bitbybit-frontend
+          image: bitbybit-frontend   # kustomize overlay sets full ghcr.io tag
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 80
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 250m
+              memory: 256Mi
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 80
+            initialDelaySeconds: 10
+            periodSeconds: 20
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 80
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            failureThreshold: 3
