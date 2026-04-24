@@ -1,12 +1,5 @@
 
 
-# Define the Markdown content for the BitByBit README
-readme_content = """# BitByBit
-
-A distributed N-tier event-streaming and audit-logging platform demonstrating cloud-native architecture, asynchronous processing, and zero-trust networking.
-
----
-
 ## Overview
 
 BitByBit is a full-stack enterprise application designed to manage complex data lifecycles with strict audit requirements. It leverages a modern microservices-inspired architecture where a **Java/Spring Boot** backend coordinates with **Apache Kafka** for decoupled event processing, **MongoDB** for flexible document storage, and a **React/TypeScript** frontend for real-time visibility.
